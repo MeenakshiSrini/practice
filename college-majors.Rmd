@@ -85,6 +85,8 @@ majors_processed %>%
   expand_limits(y = 0) +
   coord_flip() +
   theme(legend.position = "none")
+
+ggsave("boxplot.png")
 ```
 
 
