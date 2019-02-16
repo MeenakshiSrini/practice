@@ -1,0 +1,20 @@
+```{r}
+library(tidyverse)
+library(statebins)
+```
+
+```{r}
+state_hpi <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-02-05/state_hpi.csv") %>%
+  filter(year == 2018) %>%
+  group_by(state) %>%
+  summarise(mean_hpi = mean(price_index))
+
+```
+
+```{r}
+statebins_continuous(state_data = state_hpi, state_col = "state",
+                     text_color = "black", value_col = "mean_hpi",
+                     brewer_pal="PuRd", font_size = 3,
+                     legend_title="Mean housing price index by state")
+```
+
