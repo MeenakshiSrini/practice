@@ -1,0 +1,243 @@
+```{r}
+library(tidyverse)
+```
+
+```{r}
+us_wind <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-11-06/us_wind.csv")
+```
+Look at continental states and DC
+```{r}
+us_wind %>%
+  count(t_state, sort = TRUE)
+```
+
+```{r}
+us_wind %>%
+  filter(xlong < 100) %>%
+  ggplot(aes(xlong, ylat))+
+  borders("state") +
+  geom_point() +
+  coord_map() +
+  theme_void()
+```
+
+```{r}
+us_wind %>%
+  filter(!t_state %in% c("AK", "HI", "GU", "PR")) %>%
+  ggplot(aes(xlong, ylat))+
+  borders("state") +
+  geom_point() +
+  coord_map() +
+  theme_void()
+```
+
+```{r}
+us_wind %>%
+  count(p_name, sort = TRUE)
+```
+
+```{r}
+us_wind %>%
+  filter(!t_state %in% c("AK", "HI", "GU", "PR")) %>%
+  mutate(p_name = fct_lump(p_name, 6)) %>%
+  arrange(p_name !="Other") %>%
+  ggplot(aes(xlong, ylat, color = p_name))+
+  borders("state") +
+  geom_point() +
+  coord_map() +
+  theme_void()
+```
+
+```{r}
+us_wind_processed <- us_wind %>%
+  filter(!t_state %in% c("AK", "HI", "GU", "PR")) %>%
+  mutate(p_year = ifelse(p_year < -8000, NA, p_year),
+         t_cap = ifelse(t_cap < 0, NA, t_cap)) %>%
+  mutate_if(is.numeric, ~ ifelse(. == -9999, NA, .))
+
+wind_projects <- us_wind_processed %>%
+  group_by(p_name, t_state) %>%
+  summarize(year = min(p_year, na.rm = TRUE),
+            turbines = n(),
+            total_capacity = sum(t_cap),
+            long = mean(xlong),
+            lat = mean(ylat),
+            lon_sd = sd(xlong),
+            lat_sd = sd(ylat)) %>%
+  ungroup()
+
+```
+
+## How has turbine capacity changed over time?
+```{r}
+wind_projects %>%
+  ggplot(aes(long, lat, size = turbines, color = year))+
+  borders("state") +
+  geom_point() +
+  coord_map() +
+  theme_void()
+```
+
+
+### Animation
+```{r}
+
+library(gganimate)
+```
+
+```{r}
+wind_projects %>%
+  ggplot(aes(long, lat, size = turbines, color = year))+
+  borders("state") +
+  geom_point() +
+  transition_states(year, transition = 2,
+                    state_length = 1) +
+  coord_map() +
+  theme_void()
+```
+
+```{r}
+p <- wind_projects %>%
+  filter(!is.na(year), !is.infinite(year)) %>%
+  ggplot(aes(long, lat, size = turbines, color = year))+
+  borders("state") +
+  geom_point() +
+  transition_time(year) +
+  coord_map() +
+  labs(title = "Year: {frame_time}") +
+  theme_void()
+  
+animate(p)
+```
+
+```{r}
+p <- wind_projects %>%
+  filter(!is.na(year), !is.infinite(year)) %>%
+  crossing(time = 1980:2017) %>%
+  filter(year <= time) %>%
+  ggplot(aes(long, lat, size = turbines, color = year))+
+  borders("state") +
+  geom_point() +
+  transition_time(year) +
+  coord_map() +
+  labs(title = "Year: {round(frame_time)}") +
+  theme_void()
+  
+animate(p)
+```
+
+
+```{r}
+wind_projects %>%
+  filter(!is.na(year)) %>%
+  sample_n(100) %>%
+  ggplot(aes(long, lat, size = turbines, color = year))+
+  borders("state") +
+  geom_point() +
+  coord_map() +
+  theme_void()
+```
+
+```{r}
+us_wind_processed %>% distinct(p_name, p_year) %>% count(p_name, sort = TRUE)
+```
+
+```{r}
+us_wind_processed %>% filter(p_name == "San Gorgonio Farms Wind Farm") %>% arrange(p_year)
+```
+
+```{r}
+wind_projects %>% ggplot(aes(year)) + geom_histogram()
+```
+
+```{r}
+us_wind_processed %>% distinct(p_name, p_cap) %>% count(p_name, sort = TRUE)
+
+us_wind_processed %>% filter(p_name == "McNeilus") %>% count(p_cap , sort = TRUE)
+```
+
+```{r}
+wind_projects %>%
+  group_by(year) %>%
+  summarize(median_capacity = median(total_capacity, na.rm = TRUE),
+            projects = n()) %>%
+  arrange(year) %>%
+  ggplot(aes(year, median_capacity)) +
+  geom_line()
+```
+
+```{r}
+wind_projects %>%
+  ggplot(aes(year, total_capacity))+
+  geom_point()
+```
+```{r}
+wind_projects %>%
+  ggplot(aes(year, total_capacity / turbines))+
+  geom_point()
+```
+
+```{r}
+wind_projects %>%
+  ggplot(aes(long, lat, size = turbines, color = total_capacity))+
+  borders("state") +
+  geom_point() +
+  coord_map() +
+  theme_void()
+```
+
+```{r}
+us_wind_processed %>% count(t_model, sort = TRUE)
+```
+
+```{r}
+us_wind_processed %>%
+  group_by(t_model) %>%
+  summarize(t_cap = n_distinct(t_cap)) %>%
+  arrange(desc(t_cap))
+```
+
+```{r}
+us_wind_processed %>%
+  group_by(t_model) %>%
+  summarize(t_cap = median(t_cap))
+```
+
+```{r}
+us_wind_processed %>%
+  group_by(t_model) %>%
+  summarize_at(vars(t_hh, t_rd, t_rsa, t_ttlh), median)
+```
+
+```{r}
+turbine_models <- us_wind_processed %>%
+  group_by(t_model) %>%
+  summarize(t_cap = median(t_cap),
+            t_hh = median(t_hh),
+            t_rd = median(t_rd),
+            t_rsa = median(t_rsa),
+            t_ttlh = median(t_ttlh),
+            turbines = n(),
+            projects = n_distinct(p_name)) %>%
+  arrange(desc(projects))
+```
+
+
+```{r}
+turbine_models %>%
+  ggplot(aes(t_ttlh, t_cap)) +
+  geom_point() +
+  labs(title = "When it comes to turbines, bigger is better!",
+       x = "Turbine total height (meters)",
+       y = "Turbine capacity")
+```
+
+```{r}
+turbine_models %>%
+  ggplot(aes(t_rsa, t_cap)) +
+  geom_point() +
+  labs(title = "When it comes to turbines, bigger is better!",
+       x = "Turbine rotor swept area (meters ^ 2)",
+       y = "Turbine capacity")
+```
+
